@@ -23,7 +23,7 @@ fn get_json(url: &str) -> Result<Value> {
 /// Installs the loader for a Minecraft version (whose vanilla json is already in `versions/`),
 /// and returns the id of the profile to launch.
 /// `java_component` is the Java used to run installers.
-pub fn install(loader: &str, mc: &str, loader_version: Option<&str>, java_component: &str) -> Result<String> {
+pub fn install(loader: &str, mc: &str, loader_version: Option<&str>, java_component: &str, java_major: u32) -> Result<String> {
     match loader {
         "fabric" => meta_profile("Fabric", "https://meta.fabricmc.net/v2", mc, loader_version),
         "quilt" => meta_profile("Quilt", "https://meta.quiltmc.org/v3", mc, loader_version),
@@ -33,7 +33,7 @@ pub fn install(loader: &str, mc: &str, loader_version: Option<&str>, java_compon
                 None => latest_neoforge(mc)?,
             };
             let url = format!("https://maven.neoforged.net/releases/net/neoforged/neoforge/{version}/neoforge-{version}-installer.jar");
-            run_installer("NeoForge", &url, &version, &format!("neoforge-{version}"), "--install-client", java_component)
+            run_installer("NeoForge", &url, &version, &format!("neoforge-{version}"), "--install-client", java_component, java_major)
         }
         "forge" => {
             let version = match loader_version {
@@ -41,7 +41,7 @@ pub fn install(loader: &str, mc: &str, loader_version: Option<&str>, java_compon
                 None => latest_forge(mc)?,
             };
             let url = format!("https://maven.minecraftforge.net/net/minecraftforge/forge/{mc}-{version}/forge-{mc}-{version}-installer.jar");
-            run_installer("Forge", &url, &version, &format!("{mc}-forge-{version}"), "--installClient", java_component)
+            run_installer("Forge", &url, &version, &format!("{mc}-forge-{version}"), "--installClient", java_component, java_major)
         }
         other => bail!("unknown modloader \"{other}\" (try one of: {LOADERS})"),
     }
@@ -115,7 +115,7 @@ fn latest_forge(mc: &str) -> Result<String> {
 
 /// Forge and NeoForge: download the installer and run it headless against mcterm's own folder,
 /// which is laid out like a `.minecraft` (versions/, libraries/).
-fn run_installer(name: &str, url: &str, version: &str, profile_id: &str, flag: &str, java_component: &str) -> Result<String> {
+fn run_installer(name: &str, url: &str, version: &str, profile_id: &str, flag: &str, java_component: &str, java_major: u32) -> Result<String> {
     let root = paths::root()?;
     let profile_json = paths::versions()?.join(profile_id).join(format!("{profile_id}.json"));
     if profile_json.exists() {
@@ -131,7 +131,7 @@ fn run_installer(name: &str, url: &str, version: &str, profile_id: &str, flag: &
         fs::write(&launcher_profiles, r#"{"profiles":{}}"#)?;
     }
 
-    let java = runtime::ensure_java(java_component)?;
+    let java = runtime::ensure_java(java_component, java_major)?;
     say!("running the {name} {version} installer (a minute or two)");
     let output = Command::new(&java)
         .arg("-jar")

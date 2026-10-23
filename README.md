@@ -76,4 +76,10 @@ Offline accounts need none of this.
 cargo build --release
 ```
 
-Needs a recent stable Rust. Made for macOS; other systems are untested.
+Needs a recent stable Rust.
+
+## Systems
+
+- **macOS** (Apple Silicon and Intel): the one it is developed and tested on.
+- **Linux** (x86_64): supported in code (Mojang's Java for Linux, Linux libraries and natives), but **not yet tested on a real machine**. Linux on ARM works only with a Java you install yourself (`JAVA_HOME`), since Mojang ships none.
+- **Windows**: not supported yet.

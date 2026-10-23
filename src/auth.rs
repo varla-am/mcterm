@@ -166,7 +166,13 @@ pub fn login_online() -> Result<()> {
         bail!("Microsoft refused to start the sign-in (HTTP {status}): {}", device["error_description"].as_str().unwrap_or("no reason given"));
     };
     say!("open {url} and enter the code: {user_code}");
-    let _ = Command::new("open").arg(url).status();
+    let opener = match std::env::consts::OS {
+        "macos" => "open",
+        "windows" => "explorer",
+        _ => "xdg-open",
+    };
+    // If there's no browser here (an SSH session), the link above is enough
+    let _ = Command::new(opener).arg(url).status();
 
     // Wait for the sign-in to be finished in the browser
     let mut interval = device["interval"].as_u64().unwrap_or(5);

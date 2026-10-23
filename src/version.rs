@@ -154,9 +154,15 @@ pub struct OsRule {
     pub version: Option<String>,
 }
 
-/// What this machine calls itself in Mojang's rules.
-const HOST_OS: &str = "osx";
+/// What Mojang's rules call this machine's system: "osx", "linux" or "windows".
+fn host_os() -> &'static str {
+    match std::env::consts::OS {
+        "macos" => "osx",
+        other => other,
+    }
+}
 
+/// And its processor: "arm64", "x86_64", or "x86" for 32-bit Intel.
 fn host_arch() -> &'static str {
     match std::env::consts::ARCH {
         "aarch64" => "arm64",
@@ -166,14 +172,18 @@ fn host_arch() -> &'static str {
 
 impl Rule {
     fn matches(&self) -> bool {
+        self.matches_on(host_os(), host_arch())
+    }
+
+    fn matches_on(&self, host_os: &str, host_arch: &str) -> bool {
         if self.features.is_some() {
             return false;
         }
         let Some(os) = &self.os else { return true };
-        // `version` is a regex for Windows releases; it never holds for a Mac
+        // `version` is a regex for Windows releases; it never holds for the systems we support
         os.version.is_none()
-            && os.name.as_deref().map_or(true, |n| n == HOST_OS)
-            && os.arch.as_deref().map_or(true, |a| a == host_arch())
+            && os.name.as_deref().map_or(true, |n| n == host_os)
+            && os.arch.as_deref().map_or(true, |a| a == host_arch)
     }
 }
 
@@ -190,8 +200,10 @@ impl Library {
 
     /// The jar of an old-style native library for this OS, if it has one.
     pub fn native_file(&self) -> Option<&File> {
-        let key = self.natives.as_ref()?.get(HOST_OS)?;
-        self.downloads.as_ref()?.classifiers.as_ref()?.get(key)
+        // Some classifiers say which word size they are for, like "natives-windows-${arch}"
+        let word = if cfg!(target_pointer_width = "64") { "64" } else { "32" };
+        let key = self.natives.as_ref()?.get(host_os())?.replace("${arch}", word);
+        self.downloads.as_ref()?.classifiers.as_ref()?.get(&key)
     }
 }
 
@@ -295,4 +307,43 @@ fn load_value(id: &str) -> Result<Value> {
 /// A version as the game sees it: a loader's profile already merged into vanilla.
 pub fn load(id: &str) -> Result<VersionJson> {
     serde_json::from_value(load_value(id)?).with_context(|| format!("{id} has an unexpected format"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rule(action: &str, name: Option<&str>, arch: Option<&str>) -> Rule {
+        Rule {
+            action: action.into(),
+            os: Some(OsRule { name: name.map(str::to_string), arch: arch.map(str::to_string), version: None }),
+            features: None,
+        }
+    }
+
+    /// Like `rules_allow`, for a pretend machine.
+    fn allowed_on(rules: &[Rule], os: &str, arch: &str) -> bool {
+        rules.iter().filter(|r| r.matches_on(os, arch)).last().is_some_and(|r| r.action == "allow")
+    }
+
+    #[test]
+    fn linux_natives_follow_the_processor() {
+        // The arm64 build of a library is allowed only on arm64 Linux
+        let arm_only = [rule("allow", Some("linux"), Some("arm64"))];
+        assert!(allowed_on(&arm_only, "linux", "arm64"));
+        assert!(!allowed_on(&arm_only, "linux", "x86_64"));
+        assert!(!allowed_on(&arm_only, "osx", "arm64"));
+        // The plain build: on every Linux, except arm64
+        let plain = [rule("allow", Some("linux"), None), rule("disallow", Some("linux"), Some("arm64"))];
+        assert!(allowed_on(&plain, "linux", "x86_64"));
+        assert!(!allowed_on(&plain, "linux", "arm64"));
+        assert!(!allowed_on(&plain, "osx", "x86_64"));
+    }
+
+    #[test]
+    fn a_mac_only_argument_stays_off_linux() {
+        let mac = [rule("allow", Some("osx"), None)];
+        assert!(allowed_on(&mac, "osx", "arm64"));
+        assert!(!allowed_on(&mac, "linux", "x86_64"));
+    }
 }

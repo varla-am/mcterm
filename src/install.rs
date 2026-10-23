@@ -70,7 +70,7 @@ pub fn install_instance(version: &str, modloader: Option<&str>, loader_version: 
 
     // The modloader lays its profile over vanilla; from here on, `v` is the whole thing
     let profile = match modloader {
-        Some(loader) => Some(loader::install(loader, version, loader_version, java_component)?),
+        Some(loader) => Some(loader::install(loader, version, loader_version, java_component, vanilla.java_version.as_ref().map_or(8, |j| j.major))?),
         None => None,
     };
     let v = crate::version::load(profile.as_deref().unwrap_or(version))?;

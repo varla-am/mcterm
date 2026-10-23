@@ -67,8 +67,9 @@ pub fn launch_instance(name: &str) -> Result<()> {
 
     let java_component = v.java_version.as_ref().map_or("jre-legacy", |j| j.component.as_str());
     say!("preparing Java ({java_component})");
-    let java = runtime::ensure_java(java_component)?;
+    let java = runtime::ensure_java(java_component, v.java_version.as_ref().map_or(8, |j| j.major))?;
 
+    let separator = if std::env::consts::OS == "windows" { ";" } else { ":" };
     // Classpath: every library that applies here, then the game itself
     let libraries = paths::libraries()?;
     let mut classpath: Vec<PathBuf> = Vec::new();
@@ -81,7 +82,7 @@ pub fn launch_instance(name: &str) -> Result<()> {
     if let Some(missing) = classpath.iter().find(|p| !p.exists()) {
         bail!("{} is missing; try removing the instance and installing it again", missing.display());
     }
-    let classpath = classpath.iter().map(|p| p.to_string_lossy().into_owned()).collect::<Vec<_>>().join(":");
+    let classpath = classpath.iter().map(|p| p.to_string_lossy().into_owned()).collect::<Vec<_>>().join(separator);
 
     // Assets
     let assets_dir = paths::assets()?;
@@ -121,7 +122,7 @@ pub fn launch_instance(name: &str) -> Result<()> {
     values.insert("natives_directory", natives_dir.to_string_lossy().into_owned());
     values.insert("library_directory", libraries.to_string_lossy().into_owned());
     values.insert("classpath", classpath);
-    values.insert("classpath_separator", ":".into());
+    values.insert("classpath_separator", separator.into());
     values.insert("launcher_name", "mcterm".into());
     values.insert("launcher_version", env!("CARGO_PKG_VERSION").into());
 
