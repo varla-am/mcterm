@@ -1,4 +1,4 @@
-# mcterm
+# MCTerminal
 
 A Minecraft: Java Edition launcher for the terminal, written in Rust.
 
