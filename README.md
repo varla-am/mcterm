@@ -1,4 +1,6 @@
 # MCTerminal
+> [!CAUTION]
+> This project is abandoned because of rejected AppID by Mojang. Online accounts don't work.
 
 A Minecraft: Java Edition launcher for the terminal, written in Rust.
 
